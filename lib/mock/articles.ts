@@ -1,0 +1,323 @@
+import type { Article } from "@/lib/types";
+
+type ArticleSeed = Omit<Article, "canonical_url" | "created_at">;
+
+const CREATED_AT = "2026-10-17T00:30:00.000Z";
+
+function article(seed: ArticleSeed): Article {
+  return { ...seed, canonical_url: seed.url, created_at: CREATED_AT };
+}
+
+export const mockArticles: Article[] = [
+  article({
+    id: "a01",
+    url: "https://www.brecorder.com/news/oil-brent-opec-output-cuts",
+    title: "Brent crude climbs above $92 as OPEC+ signals deeper output cuts",
+    source_name: "Business Recorder",
+    source_domain: "brecorder.com",
+    published_at: "2026-10-16T21:10:00.000Z",
+    summary:
+      "Oil prices rose for a third session after OPEC+ delegates hinted at extending voluntary production cuts into the new year. Analysts warn that importers such as Pakistan could see a higher fuel import bill within weeks.",
+    topics: ["energy", "business", "economy"],
+    entities: [
+      { name: "OPEC+", type: "org" },
+      { name: "Brent crude", type: "commodity" },
+      { name: "Pakistan", type: "place" },
+    ],
+    region_tags: ["global", "PK"],
+    importance: 0.92,
+  }),
+  article({
+    id: "a02",
+    url: "https://www.dawn.com/news/sbp-policy-rate-inflation-eases",
+    title: "State Bank holds policy rate at 11% as inflation eases to 5.2%",
+    source_name: "Dawn",
+    source_domain: "dawn.com",
+    author: "Khaleeq Kiani",
+    published_at: "2026-10-16T18:40:00.000Z",
+    summary:
+      "The State Bank of Pakistan kept its benchmark rate unchanged, citing easing consumer prices but flagging oil and exchange-rate risks. The central bank said it would stay data-dependent ahead of the next review.",
+    topics: ["economy", "business"],
+    entities: [
+      { name: "State Bank of Pakistan", type: "org" },
+      { name: "Pakistani rupee", type: "currency" },
+    ],
+    region_tags: ["PK"],
+    importance: 0.88,
+  }),
+  article({
+    id: "a03",
+    url: "https://tribune.com.pk/story/kse-100-record-high-foreign-inflows",
+    title: "KSE-100 crosses record high as foreign inflows return",
+    source_name: "The Express Tribune",
+    source_domain: "tribune.com.pk",
+    published_at: "2026-10-16T12:25:00.000Z",
+    summary:
+      "The benchmark index closed at an all-time high, led by banking and energy stocks, as foreign investors turned net buyers for the first time in six weeks. Brokers cautioned that profit-taking is likely at these levels.",
+    topics: ["business", "economy"],
+    entities: [
+      { name: "KSE-100", type: "org" },
+      { name: "PSX", type: "org" },
+    ],
+    region_tags: ["PK"],
+    importance: 0.8,
+  }),
+  article({
+    id: "a04",
+    url: "https://www.thenews.com.pk/print/national-assembly-elections-act-amendments",
+    title: "National Assembly passes amendments to the Elections Act",
+    source_name: "The News",
+    source_domain: "thenews.com.pk",
+    published_at: "2026-10-16T16:05:00.000Z",
+    summary:
+      "Lawmakers approved a package of amendments covering electronic voting pilots and campaign finance disclosure. The opposition walked out during the vote, calling the changes rushed.",
+    topics: ["politics"],
+    entities: [
+      { name: "National Assembly", type: "org" },
+      { name: "Elections Act", type: "event" },
+    ],
+    region_tags: ["PK"],
+    importance: 0.72,
+  }),
+  article({
+    id: "a05",
+    url: "https://arstechnica.com/gadgets/advanced-packaging-capacity-race",
+    title: "Chipmakers race to expand advanced packaging capacity for AI accelerators",
+    source_name: "Ars Technica",
+    source_domain: "arstechnica.com",
+    author: "Jon Brodkin",
+    published_at: "2026-10-16T14:00:00.000Z",
+    summary:
+      "Foundries are pouring billions into packaging plants because the bottleneck for AI hardware has shifted from wafers to assembly. New capacity will not come online until late next year, keeping accelerator supply tight.",
+    topics: ["technology", "business"],
+    entities: [
+      { name: "TSMC", type: "org" },
+      { name: "Nvidia", type: "org" },
+    ],
+    region_tags: ["global"],
+    importance: 0.7,
+  }),
+  article({
+    id: "a06",
+    url: "https://profit.pakistantoday.com.pk/2026/10/16/it-exports-first-quarter",
+    title: "Pakistan's IT exports reach $1.1bn in first quarter, PSEB says",
+    source_name: "Profit by Pakistan Today",
+    source_domain: "profit.pakistantoday.com.pk",
+    published_at: "2026-10-16T09:30:00.000Z",
+    summary:
+      "Software and freelance services drove a double-digit rise in technology exports compared with last year. Industry groups are asking for simpler foreign-currency account rules to keep the momentum going.",
+    topics: ["technology", "economy", "business"],
+    entities: [
+      { name: "Pakistan Software Export Board", type: "org" },
+      { name: "Pakistan", type: "place" },
+    ],
+    region_tags: ["PK"],
+    importance: 0.66,
+  }),
+  article({
+    id: "a07",
+    url: "https://www.espncricinfo.com/series/pakistan-south-africa-odi-lahore-report",
+    title: "Pakistan seal ODI series against South Africa with 24-run win in Lahore",
+    source_name: "ESPNcricinfo",
+    source_domain: "espncricinfo.com",
+    published_at: "2026-10-16T17:55:00.000Z",
+    summary:
+      "A disciplined bowling effort in the final ten overs defended 287 at Gaddafi Stadium and clinched the three-match series 2-1. The captain praised the spinners for squeezing the middle overs.",
+    topics: ["sports"],
+    entities: [
+      { name: "Pakistan cricket team", type: "org" },
+      { name: "South Africa", type: "place" },
+      { name: "Lahore", type: "place" },
+    ],
+    region_tags: ["PK", "global"],
+    importance: 0.74,
+  }),
+  article({
+    id: "a08",
+    url: "https://www.aljazeera.com/news/who-dengue-south-asia-surge",
+    title: "WHO warns of dengue surge across South Asia after late monsoon",
+    source_name: "Al Jazeera",
+    source_domain: "aljazeera.com",
+    published_at: "2026-10-16T11:15:00.000Z",
+    summary:
+      "Standing water from prolonged rains has driven a sharp rise in dengue cases in several countries, straining hospitals. Health officials urge households to clear stagnant water and seek early testing for persistent fever.",
+    topics: ["health", "environment"],
+    entities: [
+      { name: "World Health Organization", type: "org" },
+      { name: "dengue", type: "event" },
+    ],
+    region_tags: ["PK", "global"],
+    importance: 0.69,
+  }),
+  article({
+    id: "a09",
+    url: "https://www.dawn.com/news/lahore-karachi-early-smog-season",
+    title: "Lahore and Karachi face early smog season, experts warn",
+    source_name: "Dawn",
+    source_domain: "dawn.com",
+    published_at: "2026-10-16T07:45:00.000Z",
+    summary:
+      "Air quality readings have already crossed unhealthy thresholds in parts of Punjab as crop burning and vehicle emissions combine with calm weather. Authorities are drafting temporary restrictions on construction and brick kilns.",
+    topics: ["environment", "health"],
+    entities: [
+      { name: "Lahore", type: "place" },
+      { name: "Karachi", type: "place" },
+    ],
+    region_tags: ["PK"],
+    importance: 0.64,
+  }),
+  article({
+    id: "a10",
+    url: "https://www.nature.com/articles/d41586-026-webb-earliest-spiral-galaxy",
+    title: "Webb telescope spots the earliest known spiral galaxy",
+    source_name: "Nature News",
+    source_domain: "nature.com",
+    published_at: "2026-10-16T15:20:00.000Z",
+    summary:
+      "Astronomers report a well-formed spiral galaxy seen as it was barely a billion years after the Big Bang. The finding challenges models that say galaxies of this kind take far longer to settle into ordered discs.",
+    topics: ["science"],
+    entities: [
+      { name: "James Webb Space Telescope", type: "org" },
+      { name: "Big Bang", type: "event" },
+    ],
+    region_tags: ["global"],
+    importance: 0.55,
+  }),
+  article({
+    id: "a11",
+    url: "https://www.bbc.com/news/world-geneva-ceasefire-talks-resume",
+    title: "Ceasefire talks resume in Geneva as leaders press for an aid corridor",
+    source_name: "BBC News",
+    source_domain: "bbc.com",
+    published_at: "2026-10-17T02:30:00.000Z",
+    summary:
+      "Negotiators returned to the table after a two-day pause, with mediators prioritising safe passage for humanitarian convoys. Officials described the atmosphere as cautious but constructive.",
+    topics: ["world", "politics"],
+    entities: [
+      { name: "Geneva", type: "place" },
+      { name: "United Nations", type: "org" },
+    ],
+    region_tags: ["global"],
+    importance: 0.85,
+  }),
+  article({
+    id: "a12",
+    url: "https://www.thenews.com.pk/print/hec-stem-scholarship-expansion",
+    title: "HEC expands scholarship programme for STEM students",
+    source_name: "The News",
+    source_domain: "thenews.com.pk",
+    published_at: "2026-10-16T10:05:00.000Z",
+    summary:
+      "The Higher Education Commission will fund an additional 3,000 places for undergraduate and master's students in science and engineering. Applications open next month, with priority for underrepresented districts.",
+    topics: ["education"],
+    entities: [{ name: "Higher Education Commission", type: "org" }],
+    region_tags: ["PK"],
+    importance: 0.5,
+  }),
+  article({
+    id: "a13",
+    url: "https://www.dawn.com/news/lahore-literary-festival-lineup",
+    title: "Lahore Literary Festival returns with record international line-up",
+    source_name: "Dawn",
+    source_domain: "dawn.com",
+    published_at: "2026-10-15T20:00:00.000Z",
+    summary:
+      "Organisers announced more than 150 writers and artists across three days of panels, readings and film screenings. A new strand will focus on Urdu poetry in translation.",
+    topics: ["culture", "entertainment"],
+    entities: [{ name: "Lahore Literary Festival", type: "event" }],
+    region_tags: ["PK"],
+    importance: 0.4,
+  }),
+  article({
+    id: "a14",
+    url: "https://www.geo.tv/latest/hit-drama-finale-streaming-record",
+    title: "Hit drama finale breaks streaming records for a Pakistani series",
+    source_name: "Geo News",
+    source_domain: "geo.tv",
+    published_at: "2026-10-16T05:20:00.000Z",
+    summary:
+      "The season finale drew the highest single-episode viewership recorded by a local streaming platform, with strong numbers from the diaspora in the UK and Gulf. The producers have confirmed a second season.",
+    topics: ["entertainment", "culture"],
+    entities: [{ name: "Geo Entertainment", type: "org" }],
+    region_tags: ["PK", "global"],
+    importance: 0.35,
+  }),
+  article({
+    id: "a15",
+    url: "https://www.thenews.com.pk/print/fia-online-fraud-ring-overseas-pakistanis",
+    title: "FIA dismantles online fraud ring targeting overseas Pakistanis",
+    source_name: "The News",
+    source_domain: "thenews.com.pk",
+    published_at: "2026-10-16T13:10:00.000Z",
+    summary:
+      "Investigators arrested eight suspects accused of running fake property listings and remittance scams. Officials advise verifying sellers through registered channels before sending money.",
+    topics: ["crime"],
+    entities: [{ name: "Federal Investigation Agency", type: "org" }],
+    region_tags: ["PK"],
+    importance: 0.45,
+  }),
+  article({
+    id: "a16",
+    url: "https://www.theguardian.com/lifeandstyle/quiet-commute-morning-ritual",
+    title: "Why the quiet commute is becoming the new morning ritual",
+    source_name: "The Guardian",
+    source_domain: "theguardian.com",
+    author: "Amelia Hart",
+    published_at: "2026-10-15T23:00:00.000Z",
+    summary:
+      "More commuters are swapping podcasts and headlines for silence, saying it helps them start the day calmer. Psychologists say a short unstructured window before work can improve focus.",
+    topics: ["lifestyle"],
+    entities: [],
+    region_tags: ["global"],
+    importance: 0.25,
+  }),
+  article({
+    id: "a17",
+    url: "https://www.dawn.com/news/skardu-flights-winter-schedule",
+    title: "Skardu flights resume as airline adds winter schedule to the north",
+    source_name: "Dawn",
+    source_domain: "dawn.com",
+    published_at: "2026-10-16T08:30:00.000Z",
+    summary:
+      "The national carrier will operate additional weekly flights to Skardu and Gilgit through the winter, weather permitting. Tour operators expect a strong season for snow and trekking tourism.",
+    topics: ["travel"],
+    entities: [
+      { name: "Skardu", type: "place" },
+      { name: "Gilgit", type: "place" },
+    ],
+    region_tags: ["PK"],
+    importance: 0.3,
+  }),
+  article({
+    id: "a18",
+    url: "https://www.dawn.com/news/opinion-rupee-stability-not-a-plan",
+    title: "The rupee's quiet stability is not an accident, and not a plan",
+    source_name: "Dawn",
+    source_domain: "dawn.com",
+    author: "Dr. Sana Rehman",
+    published_at: "2026-10-16T04:00:00.000Z",
+    summary:
+      "An economist argues that the currency's calm owes more to import compression and remittances than to structural reform. A sustained oil price rise, she writes, would test that fragile balance quickly.",
+    topics: ["opinion", "economy"],
+    entities: [{ name: "Pakistani rupee", type: "currency" }],
+    region_tags: ["PK"],
+    importance: 0.5,
+  }),
+  article({
+    id: "a19",
+    url: "https://www.theguardian.com/business/fed-holds-rates-signals-cut",
+    title: "Fed holds rates and signals one more cut before year end",
+    source_name: "The Guardian",
+    source_domain: "theguardian.com",
+    published_at: "2026-10-16T19:30:00.000Z",
+    summary:
+      "The US central bank left rates unchanged but pointed to cooling inflation and a softer labour market. Markets are pricing a cut in December, which could ease pressure on emerging-market currencies.",
+    topics: ["economy", "business", "world"],
+    entities: [
+      { name: "Federal Reserve", type: "org" },
+      { name: "US dollar", type: "currency" },
+    ],
+    region_tags: ["global"],
+    importance: 0.82,
+  }),
+];

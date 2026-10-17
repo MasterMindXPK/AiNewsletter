@@ -1,19 +1,16 @@
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
-  weekday: 'long',
-  month: 'long',
-  day: 'numeric',
-  year: 'numeric',
-  timeZone: 'America/New_York',
-})
+import {
+  DEFAULT_TIMEZONE,
+  formatEditionDate,
+  todayInTimezone,
+} from '@/lib/utils/date'
 
-const isoFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/New_York',
-})
+interface MastheadProps {
+  timezone?: string
+}
 
-export function Masthead() {
-  const now = new Date()
-  const today = dateFormatter.format(now)
-  const isoDate = isoFormatter.format(now)
+export function Masthead({ timezone = DEFAULT_TIMEZONE }: MastheadProps) {
+  const today = formatEditionDate(new Date(), timezone)
+  const isoDate = todayInTimezone(timezone)
 
   return (
     <section

@@ -1,7 +1,10 @@
 import Link from 'next/link'
-import { User } from 'lucide-react'
+import { ProfileMenu } from '@/components/profile-menu'
+import { getSessionUser } from '@/lib/auth/session'
 
-export function SiteNav() {
+export async function SiteNav() {
+  const user = await getSessionUser()
+
   return (
     <header className="border-b border-rule motion-safe:animate-fade-down">
       <nav
@@ -29,13 +32,16 @@ export function SiteNav() {
           >
             Archive
           </Link>
-          <button
-            type="button"
-            aria-label="Your profile"
-            className="flex size-8 items-center justify-center rounded-full border border-rule text-ink-muted transition-all duration-300 hover:scale-110 hover:border-burgundy hover:bg-burgundy hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-burgundy"
-          >
-            <User className="size-4" strokeWidth={1.5} aria-hidden="true" />
-          </button>
+          {user ? (
+            <ProfileMenu email={user.email} />
+          ) : (
+            <Link
+              href="/login"
+              className="border border-ink px-3.5 py-1.5 font-medium text-ink transition-colors duration-300 hover:bg-burgundy hover:border-burgundy hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-burgundy"
+            >
+              Sign in
+            </Link>
+          )}
         </div>
       </nav>
     </header>
