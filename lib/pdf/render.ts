@@ -1,16 +1,23 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import puppeteer, { type Browser } from "puppeteer";
 import type { HydratedEdition } from "@/lib/edition/load";
 import { generatePdfHtml, type TemplateOptions } from "./template";
 
-const PDF_CACHE_DIR = path.join(process.cwd(), "data", "pdfs");
-
 function ensurePdfDir(): string {
-  if (!fs.existsSync(PDF_CACHE_DIR)) {
-    fs.mkdirSync(PDF_CACHE_DIR, { recursive: true });
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  const dir = isServerless ? path.join(os.tmpdir(), "orbit-pdfs") : path.join(process.cwd(), "data", "pdfs");
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    return dir;
+  } catch {
+    const fallback = path.join(os.tmpdir(), "orbit-pdfs");
+    fs.mkdirSync(fallback, { recursive: true });
+    return fallback;
   }
-  return PDF_CACHE_DIR;
 }
 
 export function getCachedPdfPath(editionId: string): string {
