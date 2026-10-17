@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS articles (
   region_tags   TEXT NOT NULL DEFAULT '[]',
   importance    REAL NOT NULL DEFAULT 0.5 CHECK (importance BETWEEN 0 AND 1),
   cluster_id    TEXT,
+  enrich_source TEXT,                              -- 'llm' | 'fallback' | NULL (pending)
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at DESC);

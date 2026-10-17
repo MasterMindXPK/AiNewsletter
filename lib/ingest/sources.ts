@@ -98,7 +98,7 @@ export function seedSources(db: Db): number {
   const upsert = db.prepare(
     `INSERT INTO sources (id, name, domain, feed_url, region, topics, reliability, active)
      VALUES (@id, @name, @domain, @feed_url, @region, @topics, @reliability, 1)
-     ON CONFLICT(feed_url) DO UPDATE SET
+     ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        domain = excluded.domain,
        region = excluded.region,

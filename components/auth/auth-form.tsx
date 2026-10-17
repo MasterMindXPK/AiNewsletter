@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
 type Mode = "login" | "signup";
 
@@ -89,6 +89,37 @@ export function AuthForm({ mode, next, notice }: AuthFormProps) {
     }
   }
 
+  async function loginAsDemo() {
+    if (pending) return;
+    setPending(true);
+    setFormError(null);
+    setFieldErrors({});
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "demo@yourorbit.news",
+          password: "demo123",
+          next,
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as ApiResult;
+
+      if (response.ok && result.redirectTo) {
+        window.location.href = result.redirectTo;
+        return;
+      }
+
+      setFormError(result.error ?? "Failed to sign in as demo user.");
+    } catch {
+      setFormError("Could not reach server.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
     <div>
       {formError && (
@@ -162,6 +193,18 @@ export function AuthForm({ mode, next, notice }: AuthFormProps) {
           {pending && <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />}
           <span aria-live="polite">{pending ? copy.pending : copy.submit}</span>
         </button>
+
+        {mode === "login" && (
+          <button
+            type="button"
+            onClick={loginAsDemo}
+            disabled={pending}
+            className="mt-3 flex w-full items-center justify-center gap-2 border border-burgundy bg-burgundy/10 px-4 py-3 font-sans text-[13px] font-semibold text-burgundy transition-all hover:bg-burgundy hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-burgundy disabled:opacity-50"
+          >
+            <Sparkles className="size-4" />
+            <span>One-Click Demo Account (NaSCon&apos;26)</span>
+          </button>
+        )}
       </form>
 
       <div className="my-8 flex items-center gap-4" aria-hidden="true">

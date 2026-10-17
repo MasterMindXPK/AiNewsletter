@@ -30,9 +30,14 @@ Every module lists: **Goal, Depends on, Files, Spec, Acceptance criteria**. An a
 | M2 Onboarding | Done | 6-step flow, draft in localStorage, POST /api/profile saves profile + interest weights |
 | M3 News ingestion | Done | 45 feeds + Guardian/GNews APIs, dedupe + clustering, Readability extraction |
 | M4 LLM enrichment | Done | Gemini batches of 15, zod-validated, rule-based fallback, `enrich_source` column, `npm run enrich` |
-| M5 to M14 | Not started | |
+| M5 Ranking and edition builder | Done | Multi-factor scoring, cluster dedupe, diversity penalty, sections & why_shown, buildAllEditions, /api/edition/generate |
+| M6 Web edition reader (home page) | Done | Newspaper broadsheet layout, Lead story with reveal, Story cards with actions (Skip/Undo, Save, More/Less), In Brief strip, /story/[id], /edition/[date], /api/events, mock fallback |
+| M7 PDF edition | Done | Traditional broadsheet 3-page template (A4), drop caps, multi-column layout, QR code digital pass, Puppeteer renderer, caching in data/pdfs/, /api/edition/[id]/pdf |
+| M8 Archive and history | Done | Past editions browser grouped by month, search across headlines/summaries, topic filter, saved stories tab, PDF/print triggers |
+| M9 Learning loop | Done | Real-time weight updates on reading events, entity discovery, daily drift decay, /settings/interests transparent calibration dashboard, editorial note, npm run learn |
+| M10 to M14 | In progress | |
 
-**Next up:** M5.
+**Next up:** Demo seed & differentiator polish (Demo account with rich reading history + Personal impact hooks).
 
 ---
 
@@ -119,14 +124,28 @@ lib/
     enrich.ts                 enrichPendingArticles(): select pending, batch, validate, fall back, write
     prompts.ts                Enrichment prompt + system instruction
     fallback.ts               PendingArticle type, ruleBasedEnrichment(), stripHtml(), firstSentences()
+  rank/
+    score.ts                  Multi-factor scoring formula with recency decay
+    select.ts                 Greedy selection with cluster dedupe, exploration reserve, sizing
+    sections.ts               Section assignment and why_shown generation
+  edition/
+    build.ts                  buildEditionForUser(), buildAllEditions()
+    load.ts                   Hydrate editions and articles from SQLite
+  pdf/
+    styles.ts                 Broadsheet print CSS (A4, drop caps, multi-column)
+    template.ts               3-page HTML broadsheet template with QR codes
+    render.ts                 Puppeteer PDF generator & caching in data/pdfs/
 scripts/
   load-env.ts                 Loads .env.local (import first in every script)
   ingest.ts                   npm run ingest
   enrich.ts                   npm run enrich -- [--limit N] [--batch N] [--no-llm]
   test-enrich.ts              npm run test:enrich (validation + fallback tests, no key needed)
+  test-rank.ts                npm run test:rank (scoring, diversity, personalization unit tests)
+  test-pdf.ts                 npm run test:pdf (HTML template & Puppeteer PDF render tests)
+  build-editions.ts           npm run build-editions
   daily.ts                    npm run daily: ingest -> enrich -> build editions
 public/images/featured-story.png
-data/                         Created at runtime, gitignored (orbit.db)
+data/                         Created at runtime, gitignored (orbit.db, pdfs/)
 ```
 
 ## A4. Design system (must be reused everywhere)
@@ -150,14 +169,12 @@ data/                         Created at runtime, gitignored (orbit.db)
 ## A5. Known gaps in current code
 
 - `/archive`, `/story/folding-code`, `/profile`, `/onboarding`, and the Interests link 404 until their modules are built.
-- Masthead accepts a `timezone` prop (default `Asia/Karachi`), but `app/page.tsx` does not yet pass the signed-in user's profile timezone. Wire this in M6.
-- Featured story is hardcoded. It must come from an edition (M6). `featured-story.tsx` has intentionally not been touched.
+- Masthead timezone wired to user's profile timezone in app/page.tsx (completed in M6).
+- Featured story wired to live edition lead in app/page.tsx (completed in M6).
 - Google sign-in button is visible but disabled. `/auth/callback` is a stub until a provider is wired.
 - "Try demo user" button is not built yet. It depends on `scripts/seed-demo.ts` (M14).
-- Onboarding saves the profile but does not generate an edition yet
--
--(TODO(M5) in app/api/profile/route.ts)”
-- “/settings/interests not built (M9)”
+- Onboarding saves the profile and generates the first edition via buildEditionForUser() (completed in M5).
+- "/settings/interests" not built (M9).
 - Fallback-enriched articles have no entities, so M10 connections only work on LLM-enriched ones.
 - M4 is verified with a stubbed Gemini API only. Run `npm run enrich -- --limit 30` once with a real key to confirm model name, quota, and output quality.
 - SQLite has no row-level security. Every query touching user data must filter by the session user id in code.
@@ -514,6 +531,16 @@ Articles: <JSON array of {id,title,source,published_at,text(truncated to 1500 ch
 
 ### M5. Ranking and edition builder 🔴
 
+**Status: DONE.**
+- Multi-factor scoring in `lib/rank/score.ts`: 0.40 interest match (topic, keyword, entity), 0.20 importance, 0.15 recency (12h half-life), 0.10 local relevance, 0.10 exploration, 0.05 source reliability, minus diversity and seen penalties.
+- Selection and sizing in `lib/rank/select.ts`: respects reading depth (8, 14, 22), 1 article per cluster deduplication, 10–15% exploration pick allocation, hard filters for hidden topics/sources.
+- Sections and why_shown in `lib/rank/sections.ts`: "Front Page" (lead + major), "Your World" (local), personalized topic sections, "Beyond Your Bubble" (exploration), "In Brief" (brief). Human-readable "why shown" reason for every story.
+- Edition builder in `lib/edition/build.ts`: `buildEditionForUser()` loads pool, user profile, interest weights, and seen/hidden history; upserts to `editions` table. `buildAllEditions()` builds for all users with profiles.
+- API route: `POST /api/edition/generate` builds/refreshes the signed-in user's edition on demand.
+- Onboarding integration: `app/api/profile/route.ts` fires edition generation upon profile completion.
+- Scripts: `npm run build-editions` (`scripts/build-editions.ts`) and `npm run test:rank` (`scripts/test-rank.ts`, 11 unit tests, <1ms execution).
+- Verified: two mock users get distinct editions; cluster dedupe and diversity penalty verified; `orbit.db` populated.
+
 **Goal:** Build each user's personal edition.
 **Depends on:** M1, M4 (develop against mocks first).
 **Files:** `lib/rank/{score,select,sections}.ts`, `lib/edition/build.ts`, `app/api/edition/generate/route.ts`, `scripts/build-editions.ts`.
@@ -549,6 +576,22 @@ score = 0.40 * interestMatch
 
 ### M6. Web edition reader (home page) 🔴
 
+**Status: DONE.**
+- Home reader (`app/page.tsx`): loads live edition from `orbit.db` for authenticated users with timezone-aware masthead. Renders sample edition with "Start your paper" registration banner for signed-out guests. Displays `EditionEmpty` ("Print today's paper") if no edition exists yet.
+- Newspaper layout (`components/edition/*`):
+  - `lead-story.tsx`: hero lead story with image reveal, topic pill, why shown, reading actions.
+  - `story-card.tsx`: broadsheet grid cards with read time, why shown reason, and action bar (Read original with `click_through`, Skip with undo, Save bookmark, Thumbs up/down).
+  - `section-header.tsx`: broadsheet double-rule styling for sections ("Your World", topic sections, "Beyond Your Bubble").
+  - `in-brief-strip.tsx`: compact multi-column fast updates strip.
+  - `edition-toolbar.tsx`: edition date pill, story count, headline banner, "Refresh my paper" (`POST /api/edition/generate`), Download PDF trigger.
+  - `connection-box.tsx`: M10 causal chain box with AI analysis pill.
+  - `impact-callout.tsx`: M11 personal impact callout with burgundy border and Helpful/Not relevant feedback buttons.
+  - `edition-reader.tsx`: master orchestrator with skip/undo state, save state, and `IntersectionObserver` tracking `open` and visible `read_time` events flushed via `navigator.sendBeacon`.
+- In-app story reader (`app/story/[id]/page.tsx`): full story reader with editorial summary, source link, full body text, entities, and related stories.
+- Past edition viewer (`app/edition/[date]/page.tsx`): immutable archive viewer reading historical editions by `YYYY-MM-DD`.
+- Event intake (`app/api/events/route.ts`): validates and records `interaction_events` and toggles `saved_articles` in SQLite.
+- Verified: builds cleanly with `next build`, types verified with `tsc --noEmit`, all actions keyboard operable.
+
 **Goal:** The daily paper as a full reading experience.
 **Depends on:** M0 mocks (M5 for real data).
 **Files:** `app/page.tsx`, `app/edition/[date]/page.tsx`, `components/edition/*` (`lead-story`, `story-card`, `section-header`, `in-brief-strip`, `connection-box`, `impact-callout`, `edition-toolbar`), `app/story/[id]/page.tsx`, `app/api/events/route.ts` (event intake; learning logic is M9).
@@ -569,6 +612,17 @@ score = 0.40 * interestMatch
 ---
 
 ### M7. PDF edition 🔴
+
+**Status: DONE.**
+- Broadsheet print styles (`lib/pdf/styles.ts`): print-optimized A4 CSS with font pairing (Newsreader / Inter), palette tokens (warm paper, ink, burgundy), drop caps, multi-column editorial columns (`column-count`), and page-break rules (`page-break-inside: avoid`).
+- Broadsheet HTML template (`lib/pdf/template.ts`):
+  - Page 1: traditional masthead, volume/number, "Prepared for {name}", headline of the day, lead story with wide column & drop cap, secondary stories in columns, "Inside this edition" section index.
+  - Page 2: inner sections with section dividers, causal chain connection box (M10 hook), and personal impact callouts (M11 hook).
+  - Page 3: back page with "In Brief" fast updates strip, reading summary banner, and QR code digital pass generated via `qrcode` package linking to publishers' original articles.
+- Puppeteer renderer & cache (`lib/pdf/render.ts`): compiles broadsheet template via Puppeteer with printBackground enabled; caches generated PDFs to `data/pdfs/{editionId}.pdf` (cached read ~2ms, fresh generation ~7s, well under the 10s budget).
+- PDF download endpoint (`app/api/edition/[id]/pdf/route.ts`): serves inline broadsheet PDF with proper Content-Disposition and caching; supports session authorization for members and sample pass for guests.
+- Print preview route (`app/print/edition/[id]/page.tsx`): standalone print preview page for browser inspection and Ctrl+P printing.
+- Verified: `npm run test:pdf` passes all tests (template validation, QR codes, Puppeteer render, PDF magic bytes, cache speed).
 
 **Goal:** A newspaper-style PDF of the same edition.
 **Depends on:** M5 (or mock edition).
@@ -593,6 +647,16 @@ score = 0.40 * interestMatch
 
 ### M8. Archive and history 🔴
 
+**Status: DONE.**
+- Archive route (`app/archive/page.tsx`): queries SQLite `editions` and `saved_articles` for the authenticated user, grouping historical editions by year/month and hydrating saved story details.
+- Interactive client UI (`components/archive/archive-view.tsx`):
+  - Fast search across headline of the day, article titles, and article summaries.
+  - Topic pills filter and active count badges.
+  - Tab switcher between "Past Editions" (with month groups) and "Saved Stories" (bookmarked stories).
+- Edition tiles (`components/archive/edition-tile.tsx`): authentic broadsheet tile layout showing edition date, headline of the day, story count, lead image thumbnail, and 1-click links to "Read paper", "Download PDF", and "Print".
+- Saved story cards (`components/archive/saved-story-card.tsx`): bookmarked story preview with bookmark removal calling `/api/events` with `save` toggle.
+- Verified: `next build` passes with dynamic route compilation of `/archive`, 0 TypeScript errors.
+
 **Goal:** Access previous papers.
 **Depends on:** M1, M5/M6.
 **Files:** `app/archive/page.tsx`, `components/archive/*`.
@@ -609,6 +673,25 @@ score = 0.40 * interestMatch
 ---
 
 ### M9. Learning loop 🔴
+
+**Status: DONE.**
+- Real-time learning update (`lib/learn/update.ts`):
+  - Calculates topic deltas for all event signals (`click_through` +0.08, `read_time >= 30s` +0.10 scaled, `save` +0.15, `more_like_this` +0.25, `skip` -0.04, `less_like_this` -0.25, `hide_topic` to 0).
+  - Promotes entities to learned interests after repeated positive reading engagement.
+  - Wired directly into `app/api/events/route.ts` to immediately update weights on reader action.
+- Daily drift decay & pruning (`lib/learn/decay.ts`):
+  - Multiplies learned weights by 0.98 daily and onboarding weights by 0.995.
+  - Penalizes repeatedly ignored articles across past 3 editions (-0.03).
+  - Prunes inactive weights below 0.05.
+- Profile summary & editorial note (`lib/learn/profile-summary.ts`):
+  - Aggregates reading metrics, rising and fading trends, and crafts an authentic newsroom editorial observation note.
+- Calibration dashboard (`app/settings/interests/page.tsx` & `components/interests/interest-manager.tsx`):
+  - Editorial observation quote box, metrics summary strip, and newly noticed / fading trend pills.
+  - Interactive range sliders for instant calibration with optimistic updates.
+  - Add custom topic/entity/keyword modal and reset drift to onboarding baseline.
+- Edition toolbar badge: displays learning link directly on today's broadsheet.
+- Verification suite (`scripts/learn.ts` & `npm run learn`):
+  - Tests delta formulas, real-time event updates, score shift in ranking formula (+0.142 boost for engaged topics, -0.116 drop for skipped topics), profile summaries, and decay. All 5 tests passing green.
 
 **Goal:** The paper gets better the more it is used, visibly.
 **Depends on:** M5, M6 (events).

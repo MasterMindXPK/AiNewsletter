@@ -43,5 +43,17 @@ export async function setSessionCookie(userId: string): Promise<void> {
 }
 
 export async function clearSessionCookie(): Promise<void> {
-  (await cookies()).delete(SESSION_COOKIE);
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  });
+  cookieStore.delete({
+    name: SESSION_COOKIE,
+    path: "/",
+  });
 }

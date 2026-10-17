@@ -59,11 +59,12 @@ export function ProfileMenu({ email }: ProfileMenuProps) {
     setSigningOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error("[signOut] error:", error);
     } finally {
       setOpen(false);
       setSigningOut(false);
-      router.push("/");
-      router.refresh();
+      window.location.href = "/";
     }
   }
 

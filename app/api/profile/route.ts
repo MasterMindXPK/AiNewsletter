@@ -8,6 +8,7 @@ import {
   WEIGHT_KEYWORD,
   WEIGHT_TOPIC,
 } from "@/lib/onboarding/topics";
+import { buildEditionForUser } from "@/lib/edition/build";
 
 export const runtime = "nodejs";
 
@@ -107,7 +108,12 @@ export async function POST(request: Request) {
     );
   }
 
-  // TODO(M5): trigger first edition generation here (lib/edition/build.ts) and never let a
-  // failure block onboarding. Until M5 exists, just send the reader to the home page.
+  // M5: fire-and-forget first edition build — never block the onboarding redirect.
+  buildEditionForUser(db, user.id, {
+    log: (msg) => console.log("[onboarding edition]", msg),
+  }).catch((err: unknown) => {
+    console.error("[api/profile] edition build failed (non-fatal):", err);
+  });
+
   return NextResponse.json({ ok: true, redirectTo: "/" });
 }
