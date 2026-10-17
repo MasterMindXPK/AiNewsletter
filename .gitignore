@@ -18,3 +18,4 @@ data/
 node_modules
 .next/
 .DS_Store
+pnpm-lock.yaml

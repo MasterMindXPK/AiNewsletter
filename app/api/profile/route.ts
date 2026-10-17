@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth/session";
 import { onboardingSchema } from "@/lib/onboarding/schema";
@@ -116,4 +117,142 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ ok: true, redirectTo: "/" });
+}
+
+export async function GET() {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const db = getDb();
+  const profile = db.prepare("SELECT * FROM profiles WHERE id = ?").get(user.id) as
+    | {
+        id: string;
+        name: string;
+        country: string;
+        city: string;
+        timezone: string;
+        profession: string;
+        industry: string | null;
+        situation_tags: string;
+        languages: string;
+        delivery_hour: number;
+        reading_depth: string;
+        created_at: string;
+      }
+    | undefined;
+
+  if (!profile) {
+    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    profile: {
+      ...profile,
+      situation_tags: JSON.parse(profile.situation_tags || "[]"),
+      languages: JSON.parse(profile.languages || '["en"]'),
+    },
+    email: user.email,
+  });
+}
+
+const profileUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(60).optional(),
+  country: z.string().min(2).max(2).optional(),
+  city: z.string().trim().max(80).optional(),
+  timezone: z.string().optional(),
+  profession: z.string().trim().max(80).optional(),
+  industry: z.string().trim().max(80).optional().nullable(),
+  situation_tags: z.array(z.string()).optional(),
+  languages: z.array(z.string()).optional(),
+  delivery_hour: z.number().int().min(0).max(23).optional(),
+  reading_depth: z.enum(["brief", "standard", "deep"]).optional(),
+  regenerateEdition: z.boolean().optional(),
+});
+
+export async function PATCH(request: Request) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = profileUpdateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const data = parsed.data;
+  const db = getDb();
+
+  // Fetch current profile
+  const current = db.prepare("SELECT * FROM profiles WHERE id = ?").get(user.id) as any;
+  if (!current) {
+    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+  }
+
+  const nextName = data.name ?? current.name;
+  const nextCountry = data.country ?? current.country;
+  const nextCity = data.city ?? current.city;
+  const nextTimezone = data.timezone ?? current.timezone;
+  const nextProfession = data.profession ?? current.profession;
+  const nextIndustry = data.industry !== undefined ? data.industry : current.industry;
+  const nextSituationTags =
+    data.situation_tags !== undefined
+      ? JSON.stringify(data.situation_tags)
+      : current.situation_tags;
+  const nextLanguages =
+    data.languages !== undefined
+      ? JSON.stringify(data.languages)
+      : current.languages;
+  const nextDeliveryHour = data.delivery_hour ?? current.delivery_hour;
+  const nextReadingDepth = data.reading_depth ?? current.reading_depth;
+
+  db.prepare(`
+    UPDATE profiles SET
+      name = ?,
+      country = ?,
+      city = ?,
+      timezone = ?,
+      profession = ?,
+      industry = ?,
+      situation_tags = ?,
+      languages = ?,
+      delivery_hour = ?,
+      reading_depth = ?
+    WHERE id = ?
+  `).run(
+    nextName,
+    nextCountry,
+    nextCity,
+    nextTimezone,
+    nextProfession,
+    nextIndustry,
+    nextSituationTags,
+    nextLanguages,
+    nextDeliveryHour,
+    nextReadingDepth,
+    user.id
+  );
+
+  // If user requested edition refresh or reading depth changed, rebuild edition
+  if (data.regenerateEdition || (data.reading_depth && data.reading_depth !== current.reading_depth)) {
+    buildEditionForUser(db, user.id, {
+      log: (msg) => console.log("[profile update edition]", msg),
+    }).catch((err) => {
+      console.error("[api/profile] rebuild edition error:", err);
+    });
+  }
+
+  return NextResponse.json({ ok: true, message: "Profile updated successfully" });
 }

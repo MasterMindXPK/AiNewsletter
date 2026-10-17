@@ -88,17 +88,31 @@ app/
   (auth)/signup/page.tsx      Signup page
   auth/callback/route.ts      OAuth-style callback stub (Google not wired yet)
   onboarding/page.tsx         Onboarding entry (M2)
+  profile/page.tsx            Reader profile & broadsheet settings
+  settings/interests/page.tsx Interest calibration & learning loop dashboard (M9)
+  archive/page.tsx            Past editions archive & saved stories (M8)
+  edition/[date]/page.tsx     Historical past edition reader (M6)
+  print/edition/[id]/page.tsx Browser print preview (M7)
+  story/[id]/page.tsx         In-app story reader (M6)
   api/auth/signup/route.ts    Create user, set session cookie
   api/auth/login/route.ts     Verify credentials (rate limited), set session cookie
   api/auth/logout/route.ts    Clear session cookie
-  api/profile/route.ts        Save profile + interest weights (M2); TODO(M5): generate first edition
+  api/profile/route.ts        GET, POST, PATCH reader profile details & first edition build
+  api/interests/route.ts      GET and POST interest weights calibration (M9)
+  api/edition/generate/route.ts On-demand edition rebuild
+  api/edition/[id]/pdf/route.ts Broadsheet PDF generation & stream (M7)
+  api/events/route.ts         Reader interaction intake & learning loop trigger
 components/
   site-nav.tsx                Top nav, hosts ProfileMenu
   profile-menu.tsx            Signed in: Profile, Interests, Sign out. Signed out: Sign in link
+  profile/profile-editor.tsx  Interactive profile configuration & impact tag manager
+  interests/interest-manager.tsx Interactive topic sliders & observation notes (M9)
+  archive/*                   Archive viewer, edition tiles, saved stories (M8)
+  edition/*                   Broadsheet layout, lead story, story cards, impact callouts
   masthead.tsx                "Your Orbit" title, date line (timezone prop, default Asia/Karachi)
-  featured-story.tsx          Lead story (text + image), still hardcoded (M6 replaces it)
+  featured-story.tsx          Lead story (text + image)
   auth/auth-shell.tsx         Shared layout for login/signup
-  auth/auth-form.tsx          Client form: labels, inline errors, disabled Google button
+  auth/auth-form.tsx          Client form: labels, inline errors, disabled Google button, 1-Click Demo
   onboarding/*                Flow, step components, printing overlay
   ui/button.tsx               Starter, unused
 lib/
