@@ -27,10 +27,12 @@ Every module lists: **Goal, Depends on, Files, Spec, Acceptance criteria**. An a
 | --- | --- | --- |
 | M0 Foundations and shared contracts | Done | Types, mock data, date utils, masthead `timezone` prop, env example, gitignore, npm-only |
 | M1 Local database and simple auth | Done (see gaps in M1) | SQLite, cookie sessions, login/signup, profile menu, proxy |
-| M2 Onboarding | Not started | `/onboarding` is the redirect target and currently 404s |
-| M3 to M14 | Not started | |
+| M2 Onboarding | Done | 6-step flow, draft in localStorage, POST /api/profile saves profile + interest weights |
+| M3 News ingestion | Done | 45 feeds + Guardian/GNews APIs, dedupe + clustering, Readability extraction |
+| M4 LLM enrichment | Done | Gemini batches of 15, zod-validated, rule-based fallback, `enrich_source` column, `npm run enrich` |
+| M5 to M14 | Not started | |
 
-**Next up:** M2 (onboarding) and M3 (ingestion) can run in parallel.
+**Next up:** M5.
 
 ---
 
@@ -52,6 +54,7 @@ Every module lists: **Goal, Depends on, Files, Spec, Acceptance criteria**. An a
 | Database | SQLite via `better-sqlite3` (`data/orbit.db`, WAL, raw SQL) |
 | Auth | `bcryptjs` hashing, `jose` JWT in an httpOnly cookie |
 | Validation | `zod` v4 |
+| LLM | Gemini free tier via `@google/genai` (default model `gemini-2.5-flash`, override with `GEMINI_MODEL`) |
 
 shadcn tooling (`shadcn`, `@base-ui/react`, `components/ui/button.tsx`) is installed from the starter but unused. Remove it in M13 if nothing imports it.
 
@@ -71,6 +74,7 @@ npm start
 proxy.ts                      Route protection + onboarding redirect (Next 16 name for middleware)
 next.config.mjs               serverExternalPackages: ["better-sqlite3"]
 .env.example                  SESSION_SECRET, API keys, site URL
+package.json                  Scripts include: dev, build, start, ingest, enrich, test:enrich, daily
 app/
   layout.tsx                  Root layout: fonts, metadata, viewport, analytics
   page.tsx                    Home: SiteNav, Masthead, FeaturedStory
@@ -78,9 +82,11 @@ app/
   (auth)/login/page.tsx       Login page
   (auth)/signup/page.tsx      Signup page
   auth/callback/route.ts      OAuth-style callback stub (Google not wired yet)
+  onboarding/page.tsx         Onboarding entry (M2)
   api/auth/signup/route.ts    Create user, set session cookie
   api/auth/login/route.ts     Verify credentials (rate limited), set session cookie
   api/auth/logout/route.ts    Clear session cookie
+  api/profile/route.ts        Save profile + interest weights (M2); TODO(M5): generate first edition
 components/
   site-nav.tsx                Top nav, hosts ProfileMenu
   profile-menu.tsx            Signed in: Profile, Interests, Sign out. Signed out: Sign in link
@@ -88,20 +94,37 @@ components/
   featured-story.tsx          Lead story (text + image), still hardcoded (M6 replaces it)
   auth/auth-shell.tsx         Shared layout for login/signup
   auth/auth-form.tsx          Client form: labels, inline errors, disabled Google button
+  onboarding/*                Flow, step components, printing overlay
   ui/button.tsx               Starter, unused
 lib/
   types.ts                    Shared contracts (Section B1)
   db.ts                       getDb() singleton, creates data/, WAL, runs schema.sql
   schema.sql                  All tables and indexes (CREATE IF NOT EXISTS)
-  auth/token.ts               SESSION_COOKIE, sign/verify JWT (jose)
-  auth/password.ts            bcryptjs hash/verify
-  auth/session.ts             getSessionUser(), userHasProfile(), cookie helpers
-  auth/guards.ts              requireUserWithProfile(), safeNextPath()
-  auth/rate-limit.ts          In-memory login rate limit
-  auth/schemas.ts             zod schemas for auth bodies
-  mock/{profile,articles,edition,index}.ts   mockProfile, mockArticles (15+), mockEdition
-  utils/date.ts               formatEditionDate(), todayInTimezone()
   utils.ts                    Starter cn() helper
+  utils/date.ts               formatEditionDate(), todayInTimezone()
+  auth/
+    token.ts                  SESSION_COOKIE, sign/verify JWT (jose)
+    password.ts               bcryptjs hash/verify
+    session.ts                getSessionUser(), userHasProfile(), cookie helpers
+    guards.ts                 requireUserWithProfile(), safeNextPath()
+    rate-limit.ts             In-memory login rate limit
+    schemas.ts                zod schemas for auth bodies
+  mock/                       mockProfile, mockArticles (15+), mockEdition (+ index.ts)
+  onboarding/{topics,schema,draft}.ts
+  ingest/{util,normalize,dedupe,sources,rss,guardian,gnews,extract,run}.ts
+  llm/
+    client.ts                 Gemini wrapper: JSON mode, call spacing, retry/backoff, fail-fast errors, call stats
+    schemas.ts                TOPIC_VALUES, strict enrichmentSchema, lenient parseEnrichmentBatch()
+  enrich/
+    enrich.ts                 enrichPendingArticles(): select pending, batch, validate, fall back, write
+    prompts.ts                Enrichment prompt + system instruction
+    fallback.ts               PendingArticle type, ruleBasedEnrichment(), stripHtml(), firstSentences()
+scripts/
+  load-env.ts                 Loads .env.local (import first in every script)
+  ingest.ts                   npm run ingest
+  enrich.ts                   npm run enrich -- [--limit N] [--batch N] [--no-llm]
+  test-enrich.ts              npm run test:enrich (validation + fallback tests, no key needed)
+  daily.ts                    npm run daily: ingest -> enrich -> build editions
 public/images/featured-story.png
 data/                         Created at runtime, gitignored (orbit.db)
 ```
@@ -131,7 +154,12 @@ data/                         Created at runtime, gitignored (orbit.db)
 - Featured story is hardcoded. It must come from an edition (M6). `featured-story.tsx` has intentionally not been touched.
 - Google sign-in button is visible but disabled. `/auth/callback` is a stub until a provider is wired.
 - "Try demo user" button is not built yet. It depends on `scripts/seed-demo.ts` (M14).
-- No `daily`, `ingest`, `lint`, or test scripts exist yet in `package.json`.
+- Onboarding saves the profile but does not generate an edition yet
+-
+-(TODO(M5) in app/api/profile/route.ts)”
+- “/settings/interests not built (M9)”
+- Fallback-enriched articles have no entities, so M10 connections only work on LLM-enriched ones.
+- M4 is verified with a stubbed Gemini API only. Run `npm run enrich -- --limit 30` once with a real key to confirm model name, quota, and output quality.
 - SQLite has no row-level security. Every query touching user data must filter by the session user id in code.
 
 ---
@@ -319,7 +347,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 1. Follow the design system in A4. No new colors, no new fonts. Reuse existing tokens and animations.
 2. Server components by default. Use `"use client"` only where interactivity is needed.
 3. TypeScript strict. No `any`. Use types from `lib/types.ts`. Validate external and LLM data with `zod`.
-4. **Package manager is npm.** Use `npm install <pkg>` and `npx`, never pnpm or yarn. Do not create or commit any lockfile other than `package-lock.json`.
+4. **Package manager is npm.** Use `npm install <pkg>` and `npx`, never pnpm or yarn. Do not create or commit any lockfile other than `package-lock.json`. Scripts import ./load-env first so .env.local is loaded.
 5. **Database:** use SQLite only, through `lib/db.ts`. Store arrays and objects as JSON text. No external database services.
 6. **Auth:** get the user id from the session cookie on the server (`getSessionUser()`), never from the request body or query string. Every API route that touches user data must check the session.
 7. Never expose secrets to the client. LLM calls happen only in route handlers, server actions, or scripts.
@@ -398,7 +426,7 @@ Priority tags: 🔴 required by problem statement, 🟡 differentiator, 🟢 nic
 ---
 
 ### M2. Onboarding experience 🔴
-
+**Status:** DONE. Validation lives in lib/onboarding/schema.ts. POST /api/profile upserts the profile and replaces onboarding-source interest_weights (learned ones kept). Edition generation is a TODO until M5
 **Goal:** Capture enough to personalize, with a delightful, quick flow (under 90 seconds).
 **Depends on:** M0, M1.
 **Files:** `app/onboarding/page.tsx`, `components/onboarding/*`, `app/api/profile/route.ts`, `lib/onboarding/topics.ts`.
@@ -421,7 +449,10 @@ Validate the payload with `zod`. The route reads the user id from the session. A
 ---
 
 ### M3. News ingestion pipeline 🔴
-
+**Status:** DONE. Rows are stored with summary = ''; M4 enriches rows where that holds. topics and region_tags are pre-filled by rules.
+Near-duplicates are kept and share a cluster_id; M5 picks one per cluster using representativeScore from lib/ingest/dedupe.ts.
+Old articles are not deleted (the archive needs them). The 48h window applies to ingestion and to pool queries.”
+daily.ts calls enrichPendingArticles() (lib/enrich/enrich.ts) and buildAllEditions() (lib/edition/build.ts) if those files exist.
 **Goal:** Collect fresh articles from many sources.
 **Depends on:** M1.
 **Files:** `lib/ingest/{rss,guardian,gnews,normalize,dedupe,extract}.ts`, `lib/ingest/sources.ts`, `scripts/ingest.ts`, `scripts/daily.ts`, `app/api/admin/ingest/route.ts` (optional, dev only).
@@ -442,9 +473,20 @@ Validate the payload with `zod`. The route reads the user id from the session. A
 
 ### M4. LLM enrichment 🔴
 
+**Status: DONE.** Built and tested against a stubbed Gemini API and a seeded SQLite DB, then added to the repo. Differences and additions versus the original spec:
+- Extra files: `lib/enrich/fallback.ts` (rule-based path and text helpers), `scripts/test-enrich.ts` (15 tests, no API key needed).
+- **`articles.enrich_source`** (`'llm'` or `'fallback'`) is added by an idempotent `ALTER TABLE` on first run. Fallback rows from the last 48h are retried with the LLM on the next run. Add the column to `schema.sql` too if you want fresh databases to have it from the start.
+- Enriched rows get `summary`, `topics` (max 3), `entities` (max 8), `region_tags` and `importance` written as JSON text. M5 can rely on every row having a non-empty `summary`.
+- LLM output is repaired where safe (topic and entity-type aliases, 0 to 100 importance rescaled, `UK` to `GB`), then validated with zod. Items that still fail go to the fallback individually. If the model skips ids, a second pass asks for just those.
+- The LLM is switched off for the rest of a run after a bad key, an exhausted daily quota, or two failed batches in a row. The run never throws because of the LLM.
+- Fallback quality: summary = first two sentences, topics and regions from M3's rules, **no entities** (M10 needs LLM-enriched articles for entity overlap), importance from source reliability plus a coverage bonus, capped at 0.7.
+- Env: `GEMINI_API_KEY` (required for LLM), optional `GEMINI_MODEL`, `GEMINI_MIN_INTERVAL_MS` (default 4500, about 13 requests per minute).
+- Run: `npm run enrich`, `npm run enrich -- --limit 30`, `npm run enrich -- --no-llm`, `npm run test:enrich`. `npm run daily` calls `enrichPendingArticles()` automatically.
+- Not yet verified against the real Gemini API: do one small run (`--limit 30`) before the first full `daily`.
+
 **Goal:** Turn raw articles into structured, rankable data.
 **Depends on:** M3.
-**Files:** `lib/llm/{client,schemas}.ts`, `lib/enrich/{enrich,prompts}.ts`, `scripts/enrich.ts`.
+**Files:** `lib/llm/{client,schemas}.ts`, `lib/enrich/{enrich,prompts,fallback}.ts`, `scripts/enrich.ts`, `scripts/test-enrich.ts`.
 
 **Spec**
 - Batch 10 to 20 articles per Gemini call, JSON mode, validated with `zod`. Retry with backoff and respect rate limits. Skip already-enriched articles.
