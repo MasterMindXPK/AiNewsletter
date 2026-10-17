@@ -21,6 +21,19 @@ Every module lists: **Goal, Depends on, Files, Spec, Acceptance criteria**. An a
 
 ---
 
+## Progress
+
+| Module | Status | Notes |
+| --- | --- | --- |
+| M0 Foundations and shared contracts | Done | Types, mock data, date utils, masthead `timezone` prop, env example, gitignore, npm-only |
+| M1 Local database and simple auth | Done (see gaps in M1) | SQLite, cookie sessions, login/signup, profile menu, proxy |
+| M2 Onboarding | Not started | `/onboarding` is the redirect target and currently 404s |
+| M3 to M14 | Not started | |
+
+**Next up:** M2 (onboarding) and M3 (ingestion) can run in parallel.
+
+---
+
 # PART A: Current state
 
 ## A1. Tech stack (existing)
@@ -34,15 +47,19 @@ Every module lists: **Goal, Depends on, Files, Spec, Acceptance criteria**. An a
 | Fonts | Newsreader (serif), Inter (sans) via `next/font/google` |
 | Animation | CSS keyframes in the Tailwind `@theme` block, plus `tw-animate-css` |
 | Analytics | `@vercel/analytics` (production only) |
-| Package manager | **npm** |
+| Package manager | **npm** (only `package-lock.json`; pnpm files removed) |
 | Language | TypeScript |
+| Database | SQLite via `better-sqlite3` (`data/orbit.db`, WAL, raw SQL) |
+| Auth | `bcryptjs` hashing, `jose` JWT in an httpOnly cookie |
+| Validation | `zod` v4 |
 
-shadcn tooling is installed from the starter but unused.
+shadcn tooling (`shadcn`, `@base-ui/react`, `components/ui/button.tsx`) is installed from the starter but unused. Remove it in M13 if nothing imports it.
 
 ## A2. Running
 
 ```bash
 npm install
+cp .env.example .env.local   # then set SESSION_SECRET (required in production; dev uses a fallback)
 npm run dev        # http://localhost:3000
 npm run build
 npm start
@@ -51,16 +68,42 @@ npm start
 ## A3. Existing files
 
 ```
+proxy.ts                      Route protection + onboarding redirect (Next 16 name for middleware)
+next.config.mjs               serverExternalPackages: ["better-sqlite3"]
+.env.example                  SESSION_SECRET, API keys, site URL
 app/
-  layout.tsx            Root layout: fonts, metadata, viewport, analytics
-  page.tsx              Home: SiteNav, Masthead, FeaturedStory
-  globals.css           Tailwind import, theme tokens, keyframes
+  layout.tsx                  Root layout: fonts, metadata, viewport, analytics
+  page.tsx                    Home: SiteNav, Masthead, FeaturedStory
+  globals.css                 Tailwind import, theme tokens, keyframes
+  (auth)/login/page.tsx       Login page
+  (auth)/signup/page.tsx      Signup page
+  auth/callback/route.ts      OAuth-style callback stub (Google not wired yet)
+  api/auth/signup/route.ts    Create user, set session cookie
+  api/auth/login/route.ts     Verify credentials (rate limited), set session cookie
+  api/auth/logout/route.ts    Clear session cookie
 components/
-  site-nav.tsx          Top nav
-  masthead.tsx          "Your Orbit" title, date line, tagline
-  featured-story.tsx    Lead story (text + image), currently hardcoded
+  site-nav.tsx                Top nav, hosts ProfileMenu
+  profile-menu.tsx            Signed in: Profile, Interests, Sign out. Signed out: Sign in link
+  masthead.tsx                "Your Orbit" title, date line (timezone prop, default Asia/Karachi)
+  featured-story.tsx          Lead story (text + image), still hardcoded (M6 replaces it)
+  auth/auth-shell.tsx         Shared layout for login/signup
+  auth/auth-form.tsx          Client form: labels, inline errors, disabled Google button
+  ui/button.tsx               Starter, unused
+lib/
+  types.ts                    Shared contracts (Section B1)
+  db.ts                       getDb() singleton, creates data/, WAL, runs schema.sql
+  schema.sql                  All tables and indexes (CREATE IF NOT EXISTS)
+  auth/token.ts               SESSION_COOKIE, sign/verify JWT (jose)
+  auth/password.ts            bcryptjs hash/verify
+  auth/session.ts             getSessionUser(), userHasProfile(), cookie helpers
+  auth/guards.ts              requireUserWithProfile(), safeNextPath()
+  auth/rate-limit.ts          In-memory login rate limit
+  auth/schemas.ts             zod schemas for auth bodies
+  mock/{profile,articles,edition,index}.ts   mockProfile, mockArticles (15+), mockEdition
+  utils/date.ts               formatEditionDate(), todayInTimezone()
+  utils.ts                    Starter cn() helper
 public/images/featured-story.png
-lib/                    Starter utilities
+data/                         Created at runtime, gitignored (orbit.db)
 ```
 
 ## A4. Design system (must be reused everywhere)
@@ -83,10 +126,13 @@ lib/                    Starter utilities
 
 ## A5. Known gaps in current code
 
-- `/archive` and `/story/folding-code` links 404.
-- Masthead date is hardcoded to `America/New_York`. It must use the reader's time zone (default `Asia/Karachi`).
-- Featured story is hardcoded. It must come from an edition.
-- Profile button does nothing.
+- `/archive`, `/story/folding-code`, `/profile`, `/onboarding`, and the Interests link 404 until their modules are built.
+- Masthead accepts a `timezone` prop (default `Asia/Karachi`), but `app/page.tsx` does not yet pass the signed-in user's profile timezone. Wire this in M6.
+- Featured story is hardcoded. It must come from an edition (M6). `featured-story.tsx` has intentionally not been touched.
+- Google sign-in button is visible but disabled. `/auth/callback` is a stub until a provider is wired.
+- "Try demo user" button is not built yet. It depends on `scripts/seed-demo.ts` (M14).
+- No `daily`, `ingest`, `lint`, or test scripts exist yet in `package.json`.
+- SQLite has no row-level security. Every query touching user data must filter by the session user id in code.
 
 ---
 
@@ -295,6 +341,8 @@ Priority tags: 🔴 required by problem statement, 🟡 differentiator, 🟢 nic
 
 ### M0. Foundations and shared contracts 🔴
 
+**Status: DONE.** `lib/types.ts` matches B1 exactly. `lib/mock/` exports `mockProfile`, `mockArticles` (15+), `mockEdition`. `lib/utils/date.ts` has `formatEditionDate` and `todayInTimezone`. Masthead takes `timezone`. `.env.example` added; `.env*` (except the example) and `data/` are gitignored. pnpm files removed, `package-lock.json` is the only lockfile. Not done: `README.md` skeleton (M14).
+
 **Goal:** Make parallel work possible.
 **Depends on:** nothing.
 **Files:** `lib/types.ts`, `lib/mock/*`, `lib/utils/date.ts`, `.env.example`, `.gitignore`, `README.md` skeleton.
@@ -314,6 +362,13 @@ Priority tags: 🔴 required by problem statement, 🟡 differentiator, 🟢 nic
 
 ### M1. Local database and simple auth 🔴
 
+**Status: DONE, with these differences from the original spec:**
+- `proxy.ts` **does** import `lib/db.ts` to check for a profile row. Next 16 proxies run on the Node.js runtime, so this works. It redirects signed-in users without a profile to `/onboarding` for every protected page route. API routes (`/api/*`) are not profile-gated, and `/onboarding` and `/api/onboarding` are exempt to avoid a redirect loop. `requireUserWithProfile()` in `lib/auth/guards.ts` is an additional server-side check for pages.
+- Public paths are `/`, `/login`, `/signup`, `/api/auth/*`, `/auth/*`. Signed-out API calls get a `401` JSON response; signed-out page visits redirect to `/login?next=<path>`. An invalid cookie is cleared.
+- Extra files: `lib/auth/{token,guards,rate-limit,schemas}.ts`, `app/auth/callback/route.ts`, `components/auth/*`, `components/profile-menu.tsx`.
+- Not built yet: "Try demo user" button (needs `scripts/seed-demo.ts`, M14); Google sign-in (button disabled).
+- Verified by curl and browser: signup, login, logout, duplicate email (409), wrong password (401), protected redirect, tampered cookie rejected, onboarding redirect without loop, profile menu in both states.
+
 **Goal:** Persistence and user accounts, kept as simple as possible for a local demo.
 **Depends on:** M0.
 **Files:** `lib/db.ts`, `lib/schema.sql`, `lib/auth/{session,password}.ts`, `proxy.ts` (Next.js 16 name for middleware; use `middleware.ts` only if the installed version requires it), `app/(auth)/login/page.tsx`, `app/(auth)/signup/page.tsx`, `app/api/auth/{signup,login,logout}/route.ts`.
@@ -331,8 +386,8 @@ Priority tags: 🔴 required by problem statement, 🟡 differentiator, 🟢 nic
   - `saved_articles` (`user_id`, `article_id`, `created_at`)
   - `impact_cache` (`article_id`, `profile_signature`, `note_json`, `created_at`) for M11
 - Auth: email + password. `bcryptjs` for hashing. On signup and login, set an httpOnly, `sameSite=lax`, `secure` in production cookie containing a `jose`-signed JWT `{ userId }` using `SESSION_SECRET`, 7-day expiry. Helper `getSessionUser()` reads it in server components and route handlers and returns the user (or null).
-- The proxy only checks that the cookie exists and the JWT is valid (use `jose`, which works in the edge runtime), and redirects signed-out users away from protected routes (everything except `/`, `/login`, `/signup`, `/api/auth/*`). It must not import the DB.
-- Users with no profile row are redirected to `/onboarding` (check in a server component or layout, not in the proxy).
+- The proxy verifies the JWT (`jose`) and redirects signed-out users away from protected routes (everything except `/`, `/login`, `/signup`, `/api/auth/*`, `/auth/*`).
+- Users with no profile row are redirected to `/onboarding`. As built, this check lives in `proxy.ts` (Node runtime, reads SQLite) and is backed by `requireUserWithProfile()` for server components.
 - **"Try demo user" button** on the login page signs in as a seeded demo account (seeded by `scripts/seed-demo.ts`, see M14).
 - Nav profile button: menu with Profile, Interests, Sign out (signed in), or a "Sign in" link (signed out).
 - Validate all request bodies with `zod`. Return generic error messages for bad credentials. Basic rate limit on login (in-memory is fine).
